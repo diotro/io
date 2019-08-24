@@ -6,7 +6,7 @@
 
 (define (literal-read-syntax path port)
   (define parse-tree (parse path (make-tokenizer port)))
-  (writeln (syntax->datum parse-tree))
+  (pretty-write (syntax->datum parse-tree))
   (define module-datum
     `(module io-module io/expander
        ,parse-tree

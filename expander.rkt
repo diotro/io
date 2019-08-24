@@ -2,14 +2,16 @@
 
 (provide (rename-out [io-module-begin #%module-begin])
          io-program
-         io-statement
          io-expression
          io-message-sending-expression
          io-assignment
          io-identifier
-         io-literal
-         io-literal-expression
-         io-terminator)
+         io-number
+         io-string
+         io-atomic-expression
+         io-method-assignment
+         io-method-declaration
+         )
 
 (module+ test
   (require rackunit))
@@ -27,15 +29,14 @@
 
 ; An IoExpression is a [IoEnv -> IoValue]
 
-; An IoEnv is a [Map Symbol IoValue]
+; An IoEnv is a [Map Symbol IoObject]
 ; mapping identifiers to the corresponding values
 
-; An IoValue is one of:
-; - Int
-; - String
-; (going to be extended as I implement more of the language, but for now only two literal types
-; and no compound types)
+; An IoObject is a [ Map Symbol IoSlotValue ]
+; mapping slot names to slow values
 
+
+; An IoSlotValue is a [??? -> ???]
 
 (define-macro (io-program STATEMENT ...)
   #'(begin
@@ -50,18 +51,11 @@
                  ([func (list STATEMENT ...)]
                   #:when func)
          (match-define (list new-env print-output) (func env))
+         ;(displayln new-env)
+         ;(displayln print-output)
          (when print-output
-           (displayln print-output))
+           (displayln (hash-ref print-output 'value)))
          new-env))))
-
-; io-statement : produces an IoStatement
-(define-syntax (io-statement stx)
-  (syntax-case stx ()
-    ; If there is a statement, it is handled at a lower level and already a valid IoStatement here
-    [(_ statement) #'statement]
-    ; If given no args, the statement is a no-op. This represents an empty statement, like `;`
-    [_ #'#f]))
-
 
 ; io-expression : IoExpression -> IoStatement
 ; transforms the expression into a statement
@@ -69,39 +63,43 @@
   (λ (env) (list env (expression env))))
 
 
-; io-message-sending-expression : IoIdentifier IoMessage... -> IoExpression
-; TODO only evaluates the identifier, doesn't pass it messages
-(define (io-message-sending-expression identifier . messages)
-  (λ (env) (hash-ref env identifier)))
+; io-message-sending-expression : IoIdentifier IoMessage... -> IoStatement
+(define (io-message-sending-expression receiver message-name)
+ (λ (env)
+   (second ((hash-ref (hash-ref env receiver) message-name) env))))
 
 
 ; io-literal-expression : literal -> IoExpression
 ; converts a literal (either an Identifier or a number/string) into an Expression
-(define (io-literal-expression literal)
+(define (io-atomic-expression literal)
   (match literal
-    [(? number? n) (λ (env) n)]
-    [(? string? s) (λ (env) s)]
+    [(? number? n) (λ (env) (hash 'value n))]
+    [(? string? s) (λ (env) (hash 'value s))]
     [(? symbol? ident) (λ (env) (hash-ref env ident))]))
 
-; io-assignment : IoIdentifier _ IoExpression -> IoAssignment
+; io-assignment : IoIdentifier IoExpression -> IoStatement
 ; An assignment sets the value of the identifier to the result of the expression
-(define-syntax-rule (io-assignment identifier _ expression)
-  (λ (env) (list (hash-set env identifier (second (expression env))) #f)))
+(define-syntax-rule (io-assignment identifier expression)
+  (λ (env) (list (hash-set env identifier (second (expression env)))
+                 #f)))
 
 
-(define-syntax-rule (io-literal value) value)
+; io-method-assignment : IoIdentifier IoIdentifer IoMethodDecl -> IoStatement
+(define-syntax-rule (io-method-assignment object-name slot method)
+  (λ (env) (list (hash-update env object-name
+                              (λ (object) (hash-set object slot method)))
+                 #f)))
+
+; -> IoMethodDecl
+; TODO args
+(define-syntax-rule (io-method-declaration identifiers ... body)
+  (λ (env) (body env)))
+
+(define-syntax-rule (io-string value) value)
+(define-syntax-rule (io-number value) value)
 (define-syntax-rule (io-identifier name) (string->symbol name))
 
-; A terminator does nothing, obviously
-(define-syntax-rule (io-terminator _) #f)
 
-
-
-(module+ test
-  (define-syntax-rule (check-program program expected) 
-    (check-equal? (with-output-to-string (thunk program)) expected))
-  
-  )
 
 
 

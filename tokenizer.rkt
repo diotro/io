@@ -14,39 +14,38 @@
 ; Port -> Token
 (define io-lexer
   (lexer-srcloc
+   ["(" (token 'OPEN-PAREN)]
+   [")" (token 'CLOSE-PAREN)]
+   ["method" (token 'METHOD)]
+   [":=" (token 'ASSIGNMENT-OPERATOR)]
    [(:+ (:or " " "\t")) (token 'WHITESPACE lexeme #:skip? #t)]
    [(:or "\n" ";") (token 'TERMINATOR)]
-   [":=" (token 'ASSIGNMENT-OPERATOR)]
    [(from/to "\"" "\"") (token 'STRING lexeme)]
    [(:: (:? "-") (:+ numeric)) (token 'NUMBER lexeme)]
    [(:: alphabetic (:* (:or alphabetic numeric))) (token 'SYMBOL lexeme)]
-   [(from/stop-before "//" "\n") (token 'COMMENT lexeme #:skip? #t)]))
+   [(from/stop-before "//" "\n") (token 'COMMENT lexeme #:skip? #t)]
+   ))
 
 (module+ test
+  
+  (define-syntax (check-token stx)
+    (syntax-case stx ()
+      [(_ string type content)
+       #`(begin
+           (define tok (read-token string))
+           #, (syntax/loc stx (check-equal? (token-struct-type (srcloc-token-token tok)) type))
+           #, (syntax/loc stx (check-equal? (token-struct-val (srcloc-token-token tok)) content)))]))
+  
   ; Reads the first token out of a string
   (define (read-token string)
     (io-lexer (open-input-string string)))
 
-  (define symbol-token (read-token "asdf"))
-  (check-equal? (token-struct-type symbol-token) 'SYMBOL)
-  (check-equal? (token-struct-val symbol-token) "asdf")
-
-  (define string-token (read-token "\"str\""))
-  (check-equal? (token-struct-type string-token) 'STRING)
-  (check-equal? (token-struct-val string-token) "\"str\"")
-
-  (define number-token (read-token "1234"))
-  (check-equal? (token-struct-type number-token) 'NUMBER)
-  (check-equal? (token-struct-val number-token) "1234")
-
-  (define white-space-token (read-token " "))
-  (check-equal? (token-struct-type white-space-token) 'WHITESPACE)
-  (define white-space-token2 (read-token "   \n    "))
-  (check-equal? (token-struct-type white-space-token2) 'WHITESPACE)
-
-  (define input (open-input-string "//asdf \n3"))
-  (define comment-token (io-lexer input))
-  (check-equal? (token-struct-type comment-token) 'COMMENT)
-  (check-equal? (token-struct-val comment-token) "//asdf ")
+  (check-token "asdf" 'SYMBOL "asdf")
+  (check-token "\"str\"" 'STRING "\"str\"")
+  (check-token "1234" 'NUMBER "1234")
   
+  (check-token " " 'WHITESPACE " ")
+  (check-token "  " 'WHITESPACE "  ")
+
+  (check-token "//asdf \n3" 'COMMENT "//asdf ")
   )

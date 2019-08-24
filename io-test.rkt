@@ -11,5 +11,11 @@
 a := "test"
 a
 
-a2 := a
-a2
+aTwo := a
+aTwo
+
+// Messages
+
+a foo := method("this is a method")
+a foo
+a
