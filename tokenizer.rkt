@@ -15,7 +15,7 @@
 (define io-lexer
   (lexer
    [(:+ (:or " " "\t")) (token 'WHITESPACE lexeme #:skip? #t)]
-   [(:or "\n" ";") (token 'TERMINATOR lexeme)]
+   [(:or "\n" ";") (token 'TERMINATOR)]
    [":=" (token 'ASSIGNMENT-OPERATOR)]
    [(:: "\"" (:& (complement "\"") any-string) "\"") (token 'STRING lexeme)]
    [(:+ numeric) (token 'NUMBER lexeme)]
