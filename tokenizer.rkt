@@ -9,22 +9,24 @@
 ; Port -> [ -> Token]
 ; Creates a tokenizer that reads tokens from the given port
 (define (make-tokenizer port)
- (thunk (io-lexer port)))
+  (thunk (io-lexer port)))
 
 ; Port -> Token
 (define io-lexer
   (lexer
-      [(:+ (:or "\n" " ")) (token 'WHITESPACE)]
-      [(:: "\"" (:& (complement "\"") any-string) "\"") (token 'STRING lexeme)]
-      [(:+ numeric) (token 'NUMBER lexeme)]
-      [(:+ alphabetic) (token 'SYMBOL lexeme)]
-      [(:or "\n" ";") (token 'TERMINATOR lexeme)]))
-
-; Helper for tests, reads the first token out of a string
-(define (read-token string)
-  (io-lexer (open-input-string string)))
+   [(:+ (:or " " "\t")) (token 'WHITESPACE lexeme #:skip? #t)]
+   [(:or "\n" ";") (token 'TERMINATOR lexeme)]
+   [":=" (token 'ASSIGNMENT-OPERATOR)]
+   [(:: "\"" (:& (complement "\"") any-string) "\"") (token 'STRING lexeme)]
+   [(:+ numeric) (token 'NUMBER lexeme)]
+   [(:+ alphabetic) (token 'SYMBOL lexeme)]
+   ))
 
 (module+ test
+  ; Reads the first token out of a string
+  (define (read-token string)
+    (io-lexer (open-input-string string)))
+
   (define symbol-token (read-token "asdf"))
   (check-equal? (token-struct-type symbol-token) 'SYMBOL)
   (check-equal? (token-struct-val symbol-token) "asdf")
