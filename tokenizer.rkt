@@ -18,9 +18,9 @@
    [(:or "\n" ";") (token 'TERMINATOR)]
    [":=" (token 'ASSIGNMENT-OPERATOR)]
    [(:: "\"" (:& (complement "\"") any-string) "\"") (token 'STRING lexeme)]
-   [(:+ numeric) (token 'NUMBER lexeme)]
+   [(:: (:? "-") (:+ numeric)) (token 'NUMBER lexeme)]
    [(:+ alphabetic) (token 'SYMBOL lexeme)]
-   ))
+   [(from/stop-before "//" "\n") (token 'COMMENT #:skip? #t)]))
 
 (module+ test
   ; Reads the first token out of a string

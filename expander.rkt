@@ -23,22 +23,9 @@
 ; so:
 ; An IoStatement is a [IoEnv -> (list IoEnv [Maybe String])]
 
-; An IoAssignment is a (assn [IoEnv -> IoEnv])
-(struct assn [eval])
+; An IoAssignment is a [IoEnv -> IoEnv]
 
-; An IoExpression is a (expr [IoEnv -> IoValue])
-(struct expr [eval])
-
-; IoExpr IoEnv -> IoValue
-(define (eval expr env)
-  ((expr-eval expr) env))
-
-; [Either IoAssignment IoExpression] -> IoStatement
-; Converts the assignment or expression into a statement
-(define (assn-or-expr-to-statement val)
-  (cond [(assn? val) (λ (env) (list ((assn-eval val) env) #f))]
-        [(expr? val) (λ (env) (list env ((expr-eval val) env)))]
-        [else (λ (env) (list env #f))]))
+; An IoExpression is a [IoEnv -> IoValue]
 
 ; An IoEnv is a [Map Symbol IoValue]
 ; mapping identifiers to the corresponding values
@@ -62,20 +49,45 @@
        (for/fold ([env initial-env])
                  ([func (list STATEMENT ...)]
                   #:when func)
-         (match-define (list new-env print-output) ((assn-or-expr-to-statement func) env))
+         (match-define (list new-env print-output) (func env))
          (when print-output
            (displayln print-output))
          new-env))))
 
+; io-statement : produces an IoStatement
 (define-syntax (io-statement stx)
   (syntax-case stx ()
-    [(_ expr) #'expr]
-    ; If given no args, the statement is a no-op
+    ; If there is a statement, it is handled at a lower level and already a valid IoStatement here
+    [(_ statement) #'statement]
+    ; If given no args, the statement is a no-op. This represents an empty statement, like `;`
     [_ #'#f]))
 
 
-; io-expression : <io-expression in parser> -> IoExpression
-(define-syntax-rule (io-expression expression) expression)
+; io-expression : IoExpression -> IoStatement
+; transforms the expression into a statement
+(define (io-expression expression)
+  (λ (env) (list env (expression env))))
+
+
+; io-message-sending-expression : IoIdentifier IoMessage... -> IoExpression
+; TODO only evaluates the identifier, doesn't pass it messages
+(define (io-message-sending-expression identifier . messages)
+  (λ (env) (hash-ref env identifier)))
+
+
+; io-literal-expression : literal -> IoExpression
+; converts a literal (either an Identifier or a number/string) into an Expression
+(define (io-literal-expression literal)
+  (match literal
+    [(? number? n) (λ (env) n)]
+    [(? string? s) (λ (env) s)]
+    [(? symbol? ident) (λ (env) (hash-ref env ident))]))
+
+; io-assignment : IoIdentifier _ IoExpression -> IoAssignment
+; An assignment sets the value of the identifier to the result of the expression
+(define-syntax-rule (io-assignment identifier _ expression)
+  (λ (env) (list (hash-set env identifier (second (expression env))) #f)))
+
 
 (define-syntax-rule (io-literal value) value)
 (define-syntax-rule (io-identifier name) (string->symbol name))
@@ -83,20 +95,7 @@
 ; A terminator does nothing, obviously
 (define-syntax-rule (io-terminator _) #f)
 
-; io-assignment : IoIdentifier _ IoExpression -> IoAssignment
-; An assignment sets the value of the identifier to the result of the expression
-(define-syntax-rule (io-assignment identifier _ expression)
-  (assn (λ (env) (hash-set env identifier (eval expression env)))))
 
-; io-message-sending-expression : IoIdentifier IoMessage... -> IoStatement
-(define (io-message-sending-expression identifier . messages)
-  (expr (λ (env) (hash-ref env identifier))))
-
-(define (io-literal-expression literal)
-  (match literal
-    [(? number? n) (expr (λ (env) n))]
-    [(? string? s) (expr (λ (env) s))]
-    [(? symbol? ident) (expr (λ (env) (hash-ref env ident)))]))
 
 (module+ test
   (define-syntax-rule (check-program program expected) 

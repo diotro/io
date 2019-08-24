@@ -9,7 +9,8 @@
   (writeln (syntax->datum parse-tree))
   (define module-datum
     `(module io-module io/expander
-       ,parse-tree))
+       ,parse-tree
+       ))
   (datum->syntax #f module-datum))
 
 
