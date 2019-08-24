@@ -1,11 +1,15 @@
 #lang io
-
 // Comments
+3 // End of line only
 
 // Literal expressions
+2
+-3
+"hellO"
+
+// Assignment and retrieval
 a := "test"
 a
-3
-a := 4
-negative := -123
-negative
+
+a2 := a
+a2

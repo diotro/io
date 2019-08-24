@@ -13,6 +13,7 @@
    [any-char (values lexeme 'symbol #f (pos lexeme-start) (pos lexeme-end))]
    ))
 
+;; A bit redundant, but will allow extensibility later if we want a context-dependent highlighter
 (define (color-io port)
   (define-values (str cat paren start end) (io-color-lexer port))
   (values str cat paren start end))

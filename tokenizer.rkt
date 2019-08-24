@@ -13,14 +13,14 @@
 
 ; Port -> Token
 (define io-lexer
-  (lexer
+  (lexer-srcloc
    [(:+ (:or " " "\t")) (token 'WHITESPACE lexeme #:skip? #t)]
    [(:or "\n" ";") (token 'TERMINATOR)]
    [":=" (token 'ASSIGNMENT-OPERATOR)]
-   [(:: "\"" (:& (complement "\"") any-string) "\"") (token 'STRING lexeme)]
+   [(from/to "\"" "\"") (token 'STRING lexeme)]
    [(:: (:? "-") (:+ numeric)) (token 'NUMBER lexeme)]
-   [(:+ alphabetic) (token 'SYMBOL lexeme)]
-   [(from/stop-before "//" "\n") (token 'COMMENT #:skip? #t)]))
+   [(:: alphabetic (:* (:or alphabetic numeric))) (token 'SYMBOL lexeme)]
+   [(from/stop-before "//" "\n") (token 'COMMENT lexeme #:skip? #t)]))
 
 (module+ test
   ; Reads the first token out of a string
@@ -43,4 +43,10 @@
   (check-equal? (token-struct-type white-space-token) 'WHITESPACE)
   (define white-space-token2 (read-token "   \n    "))
   (check-equal? (token-struct-type white-space-token2) 'WHITESPACE)
+
+  (define input (open-input-string "//asdf \n3"))
+  (define comment-token (io-lexer input))
+  (check-equal? (token-struct-type comment-token) 'COMMENT)
+  (check-equal? (token-struct-val comment-token) "//asdf ")
+  
   )
