@@ -6,6 +6,8 @@
 "hellO"
 3(4)
 
+println
+
 // Assignment and retrieval
 a := 3
 a println
