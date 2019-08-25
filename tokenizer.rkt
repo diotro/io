@@ -16,6 +16,7 @@
   (lexer-srcloc
    ["(" (token 'OPEN-PAREN)]
    [")" (token 'CLOSE-PAREN)]
+   ["," (token 'COMMA)]
    ["method" (token 'METHOD)]
    [":=" (token 'ASSIGNMENT-OPERATOR)]
    [(:+ (:or " " "\t")) (token 'WHITESPACE lexeme #:skip? #t)]
@@ -32,14 +33,10 @@
     (syntax-case stx ()
       [(_ string type content)
        #`(begin
-           (define tok (read-token string))
-           #, (syntax/loc stx (check-equal? (token-struct-type (srcloc-token-token tok)) type))
-           #, (syntax/loc stx (check-equal? (token-struct-val (srcloc-token-token tok)) content)))]))
+           (define tok (io-lexer (open-input-string string)))
+           #,(syntax/loc stx (check-equal? (token-struct-type (srcloc-token-token tok)) type))
+           #,(syntax/loc stx (check-equal? (token-struct-val (srcloc-token-token tok)) content)))]))
   
-  ; Reads the first token out of a string
-  (define (read-token string)
-    (io-lexer (open-input-string string)))
-
   (check-token "asdf" 'SYMBOL "asdf")
   (check-token "\"str\"" 'STRING "\"str\"")
   (check-token "1234" 'NUMBER "1234")

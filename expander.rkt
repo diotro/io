@@ -3,114 +3,111 @@
 (provide (rename-out [io-module-begin #%module-begin])
          io-program
          io-expression
-         io-message-sending-expression
+         io-message
          io-assignment
          io-identifier
-         io-number
+         io-number 
          io-string
-         io-atomic-expression
-         io-method-assignment
-         io-method-declaration
          )
 
 (module+ test
   (require rackunit))
 
+; ---------------------------------------------------------------------------------------------------
+; Data Definitions
+
+; An IoObj is a (obj [Maybe IoObj] [Hash Symbol IoMsg])
+(struct obj [proto slots] #:transparent)
+
+; A SlotValue is an [Either IoMsg Predef]
+
+; A Predef is a (predef [ * -> IoObj ].
+(struct predef [func])
+
+; An IoVal is one of:
+; - String (representing a literal string)
+; - Number (representing a literal number)
+; - Symbol (representing an identifier)
+; - Predef (representing a predefined function)
+
+; An IoMsg is a (msg IoVal [List IoVal])
+(struct msg [val args] #:transparent)
+
+; ---------------------------------------------------------------------------------------------------
+; Expander
 (define-macro (io-module-begin PARSE-TREE)
   #'(#%module-begin PARSE-TREE))
 
-
-; An IoStatement is either an assignment or an expression, both of which take as input
-; the environment and produce a new environment and possibly print,
-; so:
-; An IoStatement is a [IoEnv -> (list IoEnv [Maybe String])]
-
-; An IoAssignment is a [IoEnv -> IoEnv]
-
-; An IoExpression is a [IoEnv -> IoValue]
-
-; An IoEnv is a [Map Symbol IoObject]
-; mapping identifiers to the corresponding values
-
-; An IoObject is a [ Map Symbol IoSlotValue ]
-; mapping slot names to slow values
-
-
-; An IoSlotValue is a [??? -> ???]
-
-(define-macro (io-program STATEMENT ...)
+(define-macro (io-program EXPRESSION ...)
   #'(begin
-      ; The initial environment contains no data.
-      ; This will have to be revisited to add Object and built-ins.
-      (define initial-env (hash))
-
-      ; Fold, starting from the initial environment, applying each statement
-      ; (recall that statements are functions from environment to environment + string).
-      (void
-       (for/fold ([env initial-env])
-                 ([func (list STATEMENT ...)]
-                  #:when func)
-         (match-define (list new-env print-output) (func env))
-         ;(displayln new-env)
-         ;(displayln print-output)
-         (when print-output
-           (displayln (hash-ref print-output 'value)))
-         new-env))))
-
-; io-expression : IoExpression -> IoStatement
-; transforms the expression into a statement
-(define (io-expression expression)
-  (λ (env) (list env (expression env))))
+      (define LOBBY
+        (obj #f
+             (make-hash
+              `((:= . ,(msg (predef (λ (eval k v) (hash-set! (obj-slots LOBBY) (msg-val k) (eval v)))) '()))
+                (println . ,(msg (predef (λ (eval val) (writeln (eval val)))) '()))))))
+      (for-each (λ (message-list) (receive* LOBBY message-list) (writeln LOBBY)) (list EXPRESSION ...))
+      LOBBY))
 
 
-; io-message-sending-expression : IoIdentifier IoMessage... -> IoStatement
-(define (io-message-sending-expression receiver message-name)
- (λ (env)
-   (second ((hash-ref (hash-ref env receiver) message-name) env))))
+; Evalutes to a (list SlotValue)
+(define-macro (io-expression MESSAGE ...)
+  ; We start out with the lobby as the receiver, and then receive messages in order
+  #'(list MESSAGE ...))
+
+; receive* : IoObj [List IoMsg] -> IoObj
+(define (receive* receiver messages)
+  (foldl receive receiver messages))
+
+; receive : IoMsg IoObj -> IoObj
+; Sends the given message to the object
+(define (receive message receiver)
+  (evaluate receiver message (msg-args message)))
+
+; io-message transforms into an IoMessage
+(define-macro (io-message VAL ARGS ...)
+  #'(msg VAL (list ARGS ...)))
+
+(define-macro (io-assignment NAME EXPR)
+  #'(io-expression (msg ':= (cons (msg NAME '()) EXPR))))
+
+; Could be functions!
+(define-syntax-rule (io-identifier stx) (string->symbol stx))
+(define-syntax-rule (io-number stx) (string->number stx))
+(define-syntax-rule (io-string stx) stx)
 
 
-; io-literal-expression : literal -> IoExpression
-; converts a literal (either an Identifier or a number/string) into an Expression
-(define (io-atomic-expression literal)
-  (match literal
-    [(? number? n) (λ (env) (hash 'value n))]
-    [(? string? s) (λ (env) (hash 'value s))]
-    [(? symbol? ident) (λ (env) (hash-ref env ident))]))
+; evaluate : IoObj IoMsg [List IoMsg] -> IoMsg
+(define (evaluate obj message args)
+  (match (msg-val message)
+    [(? number? num) (msg num args)]
+    [(? string? str) (msg str args)]
+    [(? symbol? sym) (evaluate obj (hash-ref (obj-slots obj) sym) args)]
+    [(? predef? fun)
+     (msg (apply (predef-func fun) (cons (λ (m) (evaluate obj m args)) args)) '())]
+    [else (error  (format "Invalid msg: ~a" message))]))
 
-; io-assignment : IoIdentifier IoExpression -> IoStatement
-; An assignment sets the value of the identifier to the result of the expression
-(define-syntax-rule (io-assignment identifier expression)
-  (λ (env) (list (hash-set env identifier (second (expression env)))
-                 #f)))
+(module+ test
+  ; Simplest case
+  #;(io-program (io-expression (io-message (io-number "0"))))
+  ; Expression with two messages
+  #;(io-program (io-expression (io-message (io-number "0"))
+                               (io-message (io-string ""))))
+  ; Program with two expressions
+  #;(io-program (io-expression (io-message (io-string "\"hello\"")))
+                (io-expression (io-message (io-string "3"))))
 
+  ; Message with args
+  #;(io-program (io-expression
+                 (io-message
+                  (io-string "\"\"")
+                  (io-expression (io-message (io-number "3"))))))
 
-; io-method-assignment : IoIdentifier IoIdentifer IoMethodDecl -> IoStatement
-(define-syntax-rule (io-method-assignment object-name slot method)
-  (λ (env) (list (hash-update env object-name
-                              (λ (object) (hash-set object slot method)))
-                 #f)))
-
-; -> IoMethodDecl
-; TODO args
-(define-syntax-rule (io-method-declaration identifiers ... body)
-  (λ (env) (body env)))
-
-(define-syntax-rule (io-string value) value)
-(define-syntax-rule (io-number value) value)
-(define-syntax-rule (io-identifier name) (string->symbol name))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  ; assignment transformer
+  (io-program (io-assignment
+               (io-identifier "a")
+               (io-expression (io-message (io-number "3"))))
+              (io-expression (io-message (io-identifier "a"))
+                             (io-message (io-identifier "println"))))
+  )
 
 

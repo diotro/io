@@ -1,21 +1,21 @@
 #lang io
-// Comments
-3 // End of line only
 
 // Literal expressions
-2
+2 // comments go to end of line and no further
 -3
 "hellO"
+3(4)
 
 // Assignment and retrieval
-a := "test"
-a
+a := 3
+a println
 
-aTwo := a
-aTwo
+//aTwo := a
+//aTwo
 
 // Messages
 
-a foo := method("this is a method")
-a foo
-a
+//a foo := method("this is a method")
+//a foo
+//a
+
