@@ -12,12 +12,9 @@ println
 a := 3
 a println
 
-//aTwo := a
-//aTwo
+// More complex messages
+plus(1, 1) println
 
-// Messages
-
-//a foo := method("this is a method")
-//a foo
-//a
-
+// Assignment with messages with arguments
+five := plus(3, 2)
+five println

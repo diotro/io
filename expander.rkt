@@ -27,7 +27,6 @@
 
 ; Evalutes to a (list SlotValue)
 (define-macro (io-expression MESSAGE ...)
-  ; We start out with the lobby as the receiver, and then receive messages in order
   #'(list MESSAGE ...))
 
 
@@ -61,7 +60,6 @@
                 (io-expression (io-message (io-number "3"))
                                (io-message (io-identifier "println"))))))
 
-  
   ; assignment transformer
   (io-program (io-assignment
                (io-identifier "a")

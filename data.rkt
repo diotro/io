@@ -30,7 +30,7 @@
 ; slot-ref : IoObj Symbol -> IoObj
 ; retrieves the value in the slot of the given object
 (define (slot-ref obj slot-name)
-  #;(displayln (list obj slot-name))
+  #;(writeln `(slot-ref ,obj ,slot-name))
   (if (hash-has-key? (obj-slots obj) slot-name)
       (hash-ref (obj-slots obj) slot-name)
       (if (obj-proto obj)
@@ -47,7 +47,7 @@
 (define (receive* receiver messages)
   (foldl (λ (m r) (evaluate r m)) receiver messages))
 
-; evaluate : Obj IoExpr -> IoMsg
+; evaluate : IoObj IoExpr -> IoObj
 (define (evaluate obj expr)
   (match (slot-ref expr 'val)
     [(? obj? obj) obj]
@@ -64,17 +64,13 @@
                    (define val (evaluate this (second args)))
                    (hash-set! (obj-slots this) (slot-ref (first args) 'val) val)
                    val))
-          (println . ,(λ (this . args) (writeln ((slot-ref this 'to-string) this))))))))
+          (println . ,(λ (this . args) (writeln ((slot-ref this 'to-string) this))))
+          (plus . ,(λ (this . args)
+                    (apply + (map (λ (arg) (slot-ref (evaluate this arg) 'val)) args))))
+          (to-string . ,(λ (this . args) this))))))
 
 (define MSG-PROTO (obj OBJ-PROTO
                        (make-hash `((to-string . ,(λ (this . args) (slot-ref this 'val)))))))
 
-(define LOBBY (make-parameter
-               (obj OBJ-PROTO
-                    (make-hash
-                     `((:= . ,(λ (this . args)
-                                (define val (evaluate this (second args)))
-                                (hash-set! (obj-slots this) (slot-ref (first args) 'val) val)
-                                val))
-                       (println . ,(λ (this . args) (writeln this #;((slot-ref this 'to-string) this)))))))))
+(define LOBBY (make-parameter (obj OBJ-PROTO (make-hash))))
 
